@@ -25,7 +25,7 @@ from skimage.measure import block_reduce
 matplotlib.rcParams['axes.linewidth'] = 1.5 #set the value globally
 from reproject import reproject_adaptive, reproject_interp
 from astropy.wcs import WCS
-import h5py
+
 import copy 
 import asdf 
 from .sky import calculate_sky_counts
@@ -53,8 +53,7 @@ class SBMap():
 
     def load_TNG50(self,fof_group,line,fof_path,cat_path):
         self.fof_group = fof_group 
-        self.map_edge, self.map_face = load_galaxy(fof_group,line,fof_path=fof_path)
-        self.load_gal_props(fof_group)
+        self.map_edge, self.map_face = load_TNG_galaxy(fof_group,line,fof_path=fof_path)
         with asdf.open(cat_path) as af:
             self.gal_props = af.tree[fof_group]
             self.rvir = self.gal_props['rvir']
@@ -494,32 +493,17 @@ class SBMap():
         edge_out = np.zeros(map_edge.shape)
         dark_current_total = self.dark_current*exptime
         for i in tqdm(range(n_exposures)):
-            
-            map_edge_raw = mrng.poisson(map_edge+sky_counts) - sky_counts
-            map_face_raw = mrng.poisson(map_face+sky_counts) - sky_counts
-            if self.read_noise != 0.0:
-                read_noise = mrng.normal(0,self.read_noise,size=size)
-            else:
-                read_noise = 0.0
-            dark_noise = mrng.normal(0,np.sqrt(dark_current_total),size=size)
-            map_edge_observed = map_edge_raw + read_noise + dark_noise
-            map_face_observed = map_face_raw + read_noise + dark_noise
+            map_edge_observed = mrng.poisson(map_edge+sky_counts+dark_current_total+self.read_noise) - sky_counts - dark_current_total - self.read_noise
+            map_face_observed = mrng.poisson(map_face+sky_counts+dark_current_total+self.read_noise) - sky_counts - dark_current_total - self.read_noise
             face_out += map_face_observed 
             edge_out += map_edge_observed
         if verbose:
             print('Combining individual exposures.')
         self.map_edge_observed = edge_out / n_exposures 
         self.map_face_observed = face_out / n_exposures
-        # if combine=='median':
-        #     self.map_edge_observed = np.median(edge_out,axis=0)
-        #     self.map_face_observed = np.median(face_out,axis=0)
-        # elif combine == 'mean':
-        #     self.map_edge_observed = np.mean(edge_out,axis=0)
-        #     self.map_face_observed = np.mean(face_out,axis=0)
-        # else:
-        #     print('combine method not recognized')
+
         if seeing_fwhm is not None:
-            self.map_edge_observe = self.apply_seeing(self.map_edge_observe,seeing_fwhm)
+            self.map_edge_observed = self.apply_seeing(self.map_edge_observed,seeing_fwhm)
             self.map_face_observed = self.apply_seeing(self.map_face_observed,seeing_fwhm)
         # Calculate the SNR analytically 
         self.SNR_face = map_face / np.sqrt(map_face+sky_counts+dark_current_total+self.read_noise**2)
@@ -709,7 +693,7 @@ class SBMap():
                     i.yaxis.label.set_color('white')
 
             return fig, ax
-    def save_fits(self,fname):
+    def save_fits(self,fname,binning_factor=None):
         '''
         Save a fits file of the current "observed" map. 
         The Header will contain information about the simulated image.
@@ -720,12 +704,20 @@ class SBMap():
         fname: str
             filepath to save the fits file.
         '''
+        map_edge = copy.deepcopy(self.map_edge_observed)
+        map_face = copy.deepcopy(self.map_face_observed)
+        if binning_factor is not None:
+            map_edge = block_reduce(map_edge, block_size=(binning_factor, binning_factor), func=np.mean)
+            map_face = block_reduce(map_face, block_size=(binning_factor, binning_factor), func=np.mean)
+
         hdr = fits.Header()
         for i in self.storage.keys():
             hdr[i] = self.storage[i]
+        hdr['EXT1'] = 'MAP FACE'
+        hdr['EXT2'] = 'MAP EDGE'
         hduPrimary = fits.PrimaryHDU(header=hdr)
-        hdu1 = fits.ImageHDU(self.map_face_observed)
-        hdu2 = fits.ImageHDU(self.map_edge_observed)
+        hdu1 = fits.ImageHDU(map_face)
+        hdu2 = fits.ImageHDU(map_edge)
         hdu_out = fits.HDUList([hduPrimary,hdu1,hdu2])
         hdu_out.writeto(fname,overwrite=True)
 
