@@ -144,7 +144,7 @@ class SBMap():
             i.set_ylim(-box_half,box_half)
         return fig, ax
     
-    def on_sky(self,distance,plot_re_multiples=None,plot_rvir=False,vmin=None,vmax=None,context='white'):
+    def on_sky(self,distance,plot_re_multiples=None,plot_rvir=False,vmin=5e-14,vmax=5e-6,context='white'):
         """
         Plot the intrinsic maps from TNG50 placed at a certain distance, now in angular on-sky units (arcmin).
 
@@ -270,7 +270,7 @@ class SBMap():
         """
         self.diameter = optical_diameter*u.m
         self.pixel_scale= pixel_scale
-        self.area = np.pi*(optical_diameter/2.0)**2
+        self.area = np.pi*(self.diameter/2.0)**2
         self.read_noise = read_noise
         self.efficiency = efficiency
         self.dark_current = dark_current
