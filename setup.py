@@ -6,5 +6,5 @@ setuptools.setup(
     author="Imad Pasha",
     author_email="imad.pasha@yale.edu",
     description="A Tool for simulating on-detector narrowband imaging of gas",
-    packages=["theia"]
+    packages=["theia","theia/TNG50"]
 )
