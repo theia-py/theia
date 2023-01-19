@@ -508,8 +508,8 @@ class SBMap():
             map_edge_observed = jax.random.poisson(key=key,lam=map_edge_counts) - sky_counts - dark_current_total
             map_face_observed = jax.random.poisson(key=key,lam=map_face_counts) - sky_counts - dark_current_total
             
-            face_out = face_out + jnp.sum(map_face_observed,axis=-1) + rdnoise_map
-            edge_out = edge_out + jnp.sum(map_edge_observed,axis=-1) + rdnoise_map
+            face_out = face_out + jnp.sum(map_face_observed + rdnoise_map, axis=-1)
+            edge_out = edge_out + jnp.sum(map_edge_observed + rdnoise_map, axis=-1)
         if verbose:
             print('Combining individual exposures.')
         self.map_edge_observed = edge_out / n_exposures 
