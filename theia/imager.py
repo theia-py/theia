@@ -1,15 +1,9 @@
-# Standard library
-import sys
-import abc
-import pickle
+
 from copy import deepcopy
 
 # Third-party
 import numpy as np
-from numpy.lib.utils import source
 from tqdm import tqdm
-from mtalg.random import MultithreadedRNG
-from numpy.random import default_rng
 import matplotlib.pyplot as plt 
 from astropy.io import fits
 from astropy import constants
@@ -18,7 +12,7 @@ from astropy import constants
 from astropy import units as u
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-from matplotlib.patches import Rectangle, FancyBboxPatch
+from matplotlib.patches import FancyBboxPatch
 from astropy.convolution import convolve_fft
 import matplotlib
 from .mags_to_counts import mags_to_counts
