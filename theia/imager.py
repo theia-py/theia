@@ -499,7 +499,7 @@ class SBMap():
         edge_out = jnp.zeros(map_edge.shape)
         dark_current_total = self.dark_current*exptime.value
         
-        for i in tqdm(range(n_exposures/10)):
+        for i in tqdm(range(int(n_exposures/10))):
             rdnoise_map = jax.random.normal(key=key,shape=(face_out.shape[0],face_out.shape[1],10))*self.read_noise
             map_edge_counts = map_edge+sky_counts+dark_current_total
             map_edge_counts = jnp.repeat(map_edge_counts[:, :, np.newaxis], 10, axis=2)
