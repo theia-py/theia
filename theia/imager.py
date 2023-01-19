@@ -34,7 +34,6 @@ from .utils import gaussian_psf, plot_circle, get_angular_extent, check_units
 from .TNG50.tng_utils import load_TNG_galaxy
 
 import jax
-from jax.random import poisson 
 import jax.numpy as jnp
 from jax import  jit 
 import jax.scipy as jsp
@@ -412,9 +411,9 @@ class SBMap():
         self.storage['sampling'] = resampling 
         
         if seed is not None:
-            mrng = MultithreadedRNG(seed=seed,num_threads=n_proc)
+            key = jax.random.PRNGKey(seed)
         else:
-            mrng = MultithreadedRNG(num_threads=n_proc)
+            key =jax.random.PRNGKey(0)
         if use_sky_spectrum:
             sky_counts = calculate_sky_counts(self.lam_eff,
                                             self.filter_bandpass,
@@ -500,16 +499,18 @@ class SBMap():
         # Add sky noise, read noise, etc. 
         if verbose:
             print('Sampling noise.')
-        size =map_edge.shape
-        face_out = np.zeros(map_face.shape)
-        edge_out = np.zeros(map_edge.shape)
+        
+
+        face_out = jnp.zeros(map_face.shape)
+        edge_out = jnp.zeros(map_edge.shape)
         dark_current_total = self.dark_current*exptime.value
         for i in tqdm(range(n_exposures)):
-            rdnoise_map = mrng.gaussian(0,self.read_noise)
-            map_edge_observed = mrng.poisson(map_edge+sky_counts+dark_current_total) - sky_counts - dark_current_total - self.read_noise
-            map_face_observed = mrng.poisson(map_face+sky_counts+dark_current_total) - sky_counts - dark_current_total - self.read_noise
-            face_out += map_face_observed 
-            edge_out += map_edge_observed
+            rdnoise_map = jax.random.normal(key=key,shape=face_out.shape)*self.read_noise
+            map_edge_observed = jax.random.poisson(map_edge+sky_counts+dark_current_total) - sky_counts - dark_current_total
+            map_face_observed = jax.random.poisson(map_face+sky_counts+dark_current_total) - sky_counts - dark_current_total
+            
+            face_out = face_out + map_face_observed + rdnoise_map
+            edge_out = edge_out + map_edge_observed + rdnoise_map
         if verbose:
             print('Combining individual exposures.')
         self.map_edge_observed = edge_out / n_exposures 
