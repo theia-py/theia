@@ -18,6 +18,7 @@ from astropy import constants
 from astropy import units as u
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
+from matplotlib.patches import Rectangle, FancyBboxPatch
 from astropy.convolution import convolve_fft
 import matplotlib
 from .mags_to_counts import mags_to_counts
@@ -29,10 +30,14 @@ from astropy.wcs import WCS
 import copy 
 import asdf 
 from .sky import calculate_sky_counts
-from .utils import gaussian_psf, plot_circle, get_angular_extent
+from .utils import gaussian_psf, plot_circle, get_angular_extent, check_units
 from .TNG50.tng_utils import load_TNG_galaxy
 
-
+import jax
+from jax.random import poisson 
+import jax.numpy as jnp
+from jax import  jit 
+import jax.scipy as jsp
 
 class SBMap():
     """
@@ -56,13 +61,15 @@ class SBMap():
         self.map_edge, self.map_face = load_TNG_galaxy(fof_group,line,fof_path=fof_path)
         with asdf.open(cat_path) as af:
             self.gal_props = af.tree[fof_group]
+            print(self.gal_props)
             self.rvir = self.gal_props['rvir']
             self.boxwidth = 2.0*self.rvir 
             self.hmr = self.gal_props['stellar_hmr']
 
-    def convert_energy_to_photon(self,image):
+    def convert_energy_to_photon(self,image,wavelength_emit):
+        wavelength_emit = check_units(wavelength_emit,'angstrom')
         im = image * u.erg/u.s/u.cm**2/u.arcsec**2 
-        photon_energy = constants.h * constants.c / (6564.614*u.angstrom)
+        photon_energy = constants.h * constants.c / (wavelength_emit)
 
         im /= photon_energy.to(u.erg)
         im = (im*u.photon).to(u.photon/u.s/u.cm**2/u.arcsec**2) 
@@ -74,7 +81,7 @@ class SBMap():
         self.hmr = stellar_hmr 
         self.map_edge = image_edge 
         self.map_face = image_face 
-        self.boxwidth=box_length_kpc 
+        self.boxwidth=check_units(box_length_kpc,'kpc')
 
     def plot_map(self,scale='log',plot_re_multiples=None,plot_rvir=False,vmin=5e-14,vmax=5e-6):
         """
@@ -103,6 +110,7 @@ class SBMap():
         if vmax is None:
             vmax = np.mean(self.map_edge) + 2*np.std(self.map_edge)
         box_half = self.boxwidth / 2.0
+        box_half = box_half.value
         if scale=='log':
             im0 = ax[0].imshow(self.map_edge,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
             im1 = ax[1].imshow(self.map_face,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
@@ -247,7 +255,7 @@ class SBMap():
 
         Parameters
         ----------
-        optical_diameter: int
+        optical_diameter: int or `~astropy.units.Quantity`
             diameter of the optical system being used, in meters.
         pixel_scale: float
             pixel scale in arcsec/pixel (e.g., 2.1).
@@ -255,7 +263,7 @@ class SBMap():
             velocity of the source (in km/s). Our filters will go from 0 to 4500 km/s, but the code
             will not stop you from entering any particular value. This parameter sets the lambda_eff
             of the bandpass, which controls the sky level when using UVES spectrum. 
-        emission_wl: float
+        emission_wl: float or `~astropy.units.Quantity`
             intrinsic emission wavelength of the line in the map you are using in Angstrom. E.g., for H-alpha this
             would be 65652.3. This plus the source velocity sets the ultimate bandpass location.
         read_noise: float
@@ -264,17 +272,19 @@ class SBMap():
             quantum efficiency of the detector *at the wavelengths of interest*. Between 0 and 1. 
         dark_current: float
             dark current in e- per second for the operating cooled detector. 
-        filter_bandpass: `astropy.Quantity`, default: 8*u.angstrom
-            filter bandpass as an astropy length quantity (e.g., u.nm or u.angstrom)
+        filter_bandpass: float or `~astropy.units.Quantity`, default: 8*u.angstrom
+            filter bandpass as an astropy length quantity (e.g., u.nm or u.angstrom, assumed angstrom)
         
         """
-        self.diameter = optical_diameter*u.m
+        self.diameter = check_units(optical_diameter,'m')
         self.pixel_scale= pixel_scale
         self.area = np.pi*(self.diameter/2.0)**2
         self.read_noise = read_noise
         self.efficiency = efficiency
         self.dark_current = dark_current
-        self.filter_bandpass = filter_bandpass
+        self.filter_bandpass = check_units(filter_bandpass,'angstrom')
+        emission_wl = check_units(emission_wl,'angstrom')
+        source_velocity = check_units(source_velocity,'km/s')
         self.lam_eff = self.lam_eff_from_v(emission_wl,source_velocity)
         self.storage = {
                         'pixscale':f'{pixel_scale} "/pix',
@@ -283,9 +293,9 @@ class SBMap():
                         'thruput': f'{efficiency}',
                         'darkcurr': f'{dark_current} e-/s',
                         'bandpass': f'{filter_bandpass.to(u.nm)}',
-                        'srcvel': f'{source_velocity} km/s',
-                        'srclam': f'{emission_wl} AA',
-                        'lameff': f'{self.lam_eff:.2f} AA',
+                        'srcvel': f'{source_velocity}',
+                        'srclam': f'{emission_wl}',
+                        'lameff': f'{self.lam_eff:.2f}',
         }
 
 
@@ -305,8 +315,8 @@ class SBMap():
         lam_eff: `astropy.Quantity`
             center of the bandpass. 
         """
-        velocity = velocity * u.km/u.s 
-        lam_eff = wavelength*u.angstrom * (1+(velocity/constants.c))
+        velocity = velocity
+        lam_eff = wavelength * (1+(velocity/constants.c))
         return lam_eff
     
     def convert_maps_to_counts(self,sb_map,exptime):
@@ -372,13 +382,13 @@ class SBMap():
 
         Parameters
         ----------
-        distance: float
+        distance: float or `~astropy.units.Quantity`
             distance to place the simulated galaxy. In Mpc.
-        exptime: float
+        exptime: float or `~astropy.units.Quantity`
             exposure time (for a single science exposure). In seconds.
         n_exposures: int
             number of science exposures to be combined in a final stack.
-        combine: float = 'median'
+        combine: float = 'mean'
             how to combine the n exposures. 'mean' or 'median' supported.
         n_proc: int, default:4
             multi-threaded RNG parameter for number of processors to use.
@@ -394,9 +404,11 @@ class SBMap():
         """
         self.detector_dims = detector_dims
         self.to_crop = crop 
-        self.storage['exptime'] = f'{exptime} s'
+        exptime = check_units(exptime,'s')
+        distance = check_units(distance,'Mpc')
+        self.storage['exptime'] = f'{exptime}'
         self.storage['nexp'] = f'{n_exposures}'
-        self.storage['D'] = f'{distance} Mpc'
+        self.storage['D'] = f'{distance}'
         self.storage['sampling'] = resampling 
         
         if seed is not None:
@@ -491,10 +503,11 @@ class SBMap():
         size =map_edge.shape
         face_out = np.zeros(map_face.shape)
         edge_out = np.zeros(map_edge.shape)
-        dark_current_total = self.dark_current*exptime
+        dark_current_total = self.dark_current*exptime.value
         for i in tqdm(range(n_exposures)):
-            map_edge_observed = mrng.poisson(map_edge+sky_counts+dark_current_total+self.read_noise) - sky_counts - dark_current_total - self.read_noise
-            map_face_observed = mrng.poisson(map_face+sky_counts+dark_current_total+self.read_noise) - sky_counts - dark_current_total - self.read_noise
+            rdnoise_map = mrng.gaussian(0,self.read_noise)
+            map_edge_observed = mrng.poisson(map_edge+sky_counts+dark_current_total) - sky_counts - dark_current_total - self.read_noise
+            map_face_observed = mrng.poisson(map_face+sky_counts+dark_current_total) - sky_counts - dark_current_total - self.read_noise
             face_out += map_face_observed 
             edge_out += map_edge_observed
         if verbose:
@@ -592,6 +605,7 @@ class SBMap():
                             vmin=None,
                             vmax=None,
                             binning_factor=None,
+                            overlay_properties=True,
                             context='white'):
         """
         Plot the observed maps from TNG50 placed at a certain distance, now in detector pixels with all noise added.
@@ -692,6 +706,13 @@ class SBMap():
                     i.xaxis.label.set_color('white')
                     i.yaxis.label.set_color('white')
 
+            if overlay_properties:
+                if hasattr(self,'gal_props'):
+                    rect = FancyBboxPatch((0.65, 0.025), 0.33,0.18, boxstyle="round,pad=0.01",linewidth=1, edgecolor='k', facecolor='white',transform=ax[1].transAxes,zorder=10,alpha=0.85)
+                    ax[1].add_patch(rect)
+                    ax[1].text(0.95,0.15,rf"log $M_*$: {self.gal_props['subhalo_stellar_mass']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
+                    ax[1].text(0.95,0.05,rf"$R_{{vir}}$: {self.gal_props['rvir']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
+
             return fig, ax
     def save_fits(self,fname,binning_factor=None):
         '''
@@ -715,6 +736,8 @@ class SBMap():
             hdr[i] = self.storage[i]
         hdr['EXT1'] = 'MAP FACE'
         hdr['EXT2'] = 'MAP EDGE'
+        for i in self.storage.keys():
+            hdr[i] = self.storage[i]
         hduPrimary = fits.PrimaryHDU(header=hdr)
         hdu1 = fits.ImageHDU(map_face)
         hdu2 = fits.ImageHDU(map_edge)
@@ -723,5 +746,7 @@ class SBMap():
 
 
 
+
+        
 
 

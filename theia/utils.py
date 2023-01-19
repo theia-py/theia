@@ -3,6 +3,32 @@ from astropy.stats import gaussian_fwhm_to_sigma
 from astropy import units as u
 from astropy.convolution import Gaussian2DKernel, Moffat2DKernel
 
+
+def check_units(value, default_unit):
+    """
+    Check if an object has units. If not, apply the default unit.
+    Parameters
+    ----------
+    value : float, list-like, or `~astropy.units.Quantity`
+        Parameter that has units.
+    default_unit : str or `astropy` unit
+        The default unit to apply to `value` if it does not have units.
+    Returns
+    -------
+    quantity : `~astropy.units.Quantity`
+        `value` with ``astropy`` units.
+    """
+    t = type(default_unit)
+    if type(value) == u.Quantity:
+        quantity = value
+    elif (t == u.IrreducibleUnit) or (t == u.Unit) or (t == u.CompositeUnit):
+        quantity = value * default_unit
+    elif t == str:
+        quantity = value * getattr(u, default_unit)
+    else:
+        raise Exception('default_unit must be an astropy unit or string')
+    return quantity
+
 def gaussian_psf(fwhm, pixel_scale=0.2, shape=41, mode='center', factor=10):
     """
     Gaussian point-spread function.
@@ -94,8 +120,7 @@ def get_angular_extent(boxwidth,distance):
     angular_size: `astropy.Quantity`
         angle on sky corresponding to the full length, in arcminutes.
     """
-    boxhalf = boxwidth/2.0
-    distance = distance*u.Mpc
-    boxhalf = boxhalf*u.kpc
+    boxhalf = check_units(boxwidth,'kpc')/2.0
+    distance = check_units(distance,'Mpc')
     angular_size = np.arctan(boxhalf/distance).to(u.arcmin)
     return angular_size*2
