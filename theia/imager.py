@@ -362,7 +362,6 @@ class SBMap():
                     seeing_fwhm=None,
                     crop=False,
                     detector_dims=(3000,3000),
-                    n_proc=4,
                     resampling='interp',
                     seed=None,
                     use_sky_spectrum=True,
