@@ -487,7 +487,8 @@ class SBMap():
             map_edge = insert_edge
         #sky_noise_scale = np.sqrt(sky_level)
         #sky_noise = np.random.normal(loc=0,scale=sky_noise_scale,size=map_edge.shape)
-
+        map_face = jnp.array(map_face)
+        map_edge = jnp.array(map_edge)
 
         # Add sky noise, read noise, etc. 
         if verbose:
@@ -497,13 +498,18 @@ class SBMap():
         face_out = jnp.zeros(map_face.shape)
         edge_out = jnp.zeros(map_edge.shape)
         dark_current_total = self.dark_current*exptime.value
-        for i in tqdm(range(n_exposures)):
-            rdnoise_map = jax.random.normal(key=key,shape=face_out.shape)*self.read_noise
-            map_edge_observed = jax.random.poisson(key=key,lam=map_edge+sky_counts+dark_current_total) - sky_counts - dark_current_total
-            map_face_observed = jax.random.poisson(key=key,lam=map_face+sky_counts+dark_current_total) - sky_counts - dark_current_total
+        
+        for i in tqdm(range(n_exposures/10)):
+            rdnoise_map = jax.random.normal(key=key,shape=(face_out.shape[0],face_out.shape[1],10))*self.read_noise
+            map_edge_counts = map_edge+sky_counts+dark_current_total
+            map_edge_counts = jnp.repeat(map_edge_counts[:, :, np.newaxis], 10, axis=2)
+            map_face_counts = map_face+sky_counts+dark_current_total
+            map_face_counts = jnp.repeat(map_face_counts[:,:,np.newaxis],10,axis=2)
+            map_edge_observed = jax.random.poisson(key=key,lam=map_edge_counts) - sky_counts - dark_current_total
+            map_face_observed = jax.random.poisson(key=key,lam=map_face_counts) - sky_counts - dark_current_total
             
-            face_out = face_out + map_face_observed + rdnoise_map
-            edge_out = edge_out + map_edge_observed + rdnoise_map
+            face_out = face_out + jnp.sum(map_face_observed,axis=-1) + rdnoise_map
+            edge_out = edge_out + jnp.sum(map_edge_observed,axis=-1) + rdnoise_map
         if verbose:
             print('Combining individual exposures.')
         self.map_edge_observed = edge_out / n_exposures 
