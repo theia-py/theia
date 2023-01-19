@@ -506,8 +506,8 @@ class SBMap():
         dark_current_total = self.dark_current*exptime.value
         for i in tqdm(range(n_exposures)):
             rdnoise_map = jax.random.normal(key=key,shape=face_out.shape)*self.read_noise
-            map_edge_observed = jax.random.poisson(map_edge+sky_counts+dark_current_total) - sky_counts - dark_current_total
-            map_face_observed = jax.random.poisson(map_face+sky_counts+dark_current_total) - sky_counts - dark_current_total
+            map_edge_observed = jax.random.poisson(key=key,lam=map_edge+sky_counts+dark_current_total) - sky_counts - dark_current_total
+            map_face_observed = jax.random.poisson(key=key,lam=map_face+sky_counts+dark_current_total) - sky_counts - dark_current_total
             
             face_out = face_out + map_face_observed + rdnoise_map
             edge_out = edge_out + map_edge_observed + rdnoise_map
