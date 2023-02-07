@@ -500,13 +500,15 @@ class SBMap():
         dark_current_total = self.dark_current*exptime.value
         
         for i in tqdm(range(int(n_exposures/10))):
-            rdnoise_map = jax.random.normal(key=key,shape=(face_out.shape[0],face_out.shape[1],10))*self.read_noise
+            key, subkey = jax.random.split(key)
+            key, subkey2 = jax.random.split(key)
+            rdnoise_map = jax.random.normal(key=subkey,shape=(face_out.shape[0],face_out.shape[1],10))*self.read_noise
             map_edge_counts = map_edge+sky_counts+dark_current_total
             map_edge_counts = jnp.repeat(map_edge_counts[:, :, np.newaxis], 10, axis=2)
             map_face_counts = map_face+sky_counts+dark_current_total
             map_face_counts = jnp.repeat(map_face_counts[:,:,np.newaxis],10,axis=2)
-            map_edge_observed = jax.random.poisson(key=key,lam=map_edge_counts) - sky_counts - dark_current_total
-            map_face_observed = jax.random.poisson(key=key,lam=map_face_counts) - sky_counts - dark_current_total
+            map_edge_observed = jax.random.poisson(key=subkey,lam=map_edge_counts) - sky_counts - dark_current_total
+            map_face_observed = jax.random.poisson(key=subkey2,lam=map_face_counts) - sky_counts - dark_current_total
             
             face_out = face_out + jnp.sum(map_face_observed + rdnoise_map, axis=-1)
             edge_out = edge_out + jnp.sum(map_edge_observed + rdnoise_map, axis=-1)
