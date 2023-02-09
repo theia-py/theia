@@ -156,9 +156,9 @@ class SBMap():
             the figure and axes objects for further manipulation.
         """
         if vmin is None:
-            vmin = np.mean(self.map_edge) - np.std(self.map_edge)
+            vmin = np.mean(self.map) - np.std(self.map)
         if vmax is None:
-            vmax = np.mean(self.map_edge) + np.std(self.map_edge)
+            vmax = np.mean(self.map_) + np.std(self.map)
         boxwidth = get_angular_extent(self.boxwidth,distance).value
             
         
@@ -200,7 +200,7 @@ class SBMap():
                 for i in plot_re_multiples:
                     plot_circle(r=i*hmr_in_pix,ax=ax,color='w')
             if plot_rvir:
-                plot_circle(r=rvir_in_pix,ax=ax[0],color='k')
+                plot_circle(r=rvir_in_pix,ax=ax,color='k')
             ax.set_xlim(-box_half,box_half)
             ax.set_ylim(-box_half,box_half)
             if context == 'black':
@@ -396,11 +396,9 @@ class SBMap():
         if verbose:
             print('Reprojecting onto DSLM pixel scale.')
         if resampling=='interp':
-            self.reprojected_edge = reproject_interp((map_edge,input_wcs),output_wcs,shape_out=detector_dims)
-            self.reprojected_face = reproject_interp((map_face,input_wcs),output_wcs,shape_out=detector_dims)
+            self.reprojected_edge = reproject_interp((map,input_wcs),output_wcs,shape_out=detector_dims)
         elif resampling == 'adaptive':
-            self.reprojected_edge = reproject_adaptive((map_edge,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
-            self.reprojected_face = reproject_adaptive((map_face,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
+            self.reprojected_edge = reproject_adaptive((map,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
         
         
         
