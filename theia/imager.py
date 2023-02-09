@@ -56,9 +56,9 @@ class SBMap():
         with asdf.open(cat_path) as af:
             self.gal_props = af.tree[fof_group]
             print(self.gal_props)
-            self.rvir = self.gal_props['rvir']
+            self.rvir = check_units(self.gal_props['rvir'],'kpc')
             self.boxwidth = 2.0*self.rvir 
-            self.hmr = self.gal_props['stellar_hmr']
+            self.hmr = check_units(self.gal_props['stellar_hmr'],'kpc')
         if orientation =='face':
             self.map = map_edge 
         elif orientation == 'edge':
