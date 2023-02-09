@@ -386,12 +386,12 @@ class SBMap():
         output_wcs.wcs.cdelt = -desired_pixel_scale.value, desired_pixel_scale.value
         
         #Modify maps into counts
-        map_use= self.convert_maps_to_counts(self.map_face,exptime)*self.efficiency
+        map_use= self.convert_maps_to_counts(self.map,exptime)*self.efficiency
         
         if verbose:
             print('Reprojecting onto DSLM pixel scale.')
 
-        self.reprojected_edge = reproject_adaptive((map_use,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
+        self.reprojected_map = reproject_adaptive((map_use,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
         
         
         
@@ -439,37 +439,26 @@ class SBMap():
                 sky_counts = sky_counts
             else: 
                 raise AssertionError('Either sky counts or sky mag must be provided if use spectrum is false.')
-        map_face = self.reprojected_face 
-        map_edge = self.reprojected_edge 
-        face_out = jnp.zeros(map_face.shape)
-        edge_out = jnp.zeros(map_edge.shape)
+        map_use = self.reprojected_map
+        map_out = jnp.zeros(map_use.shape)
         dark_current_total = self.dark_current*exptime.value
         
         for i in tqdm(range(int(n_exposures/10))):
             key, subkey = jax.random.split(key)
             key, subkey2 = jax.random.split(key)
-            rdnoise_map = jax.random.normal(key=subkey,shape=(face_out.shape[0],face_out.shape[1],10))*self.read_noise
-            map_edge_counts = map_edge+sky_counts+dark_current_total
-            map_edge_counts = jnp.repeat(map_edge_counts[:, :, np.newaxis], 10, axis=2)
-            map_face_counts = map_face+sky_counts+dark_current_total
-            map_face_counts = jnp.repeat(map_face_counts[:,:,np.newaxis],10,axis=2)
-            map_edge_observed = jax.random.poisson(key=subkey,lam=map_edge_counts) - sky_counts - dark_current_total
-            map_face_observed = jax.random.poisson(key=subkey2,lam=map_face_counts) - sky_counts - dark_current_total
+            rdnoise_map = jax.random.normal(key=subkey,shape=(map_out.shape[0],map_out.shape[1],10))*self.read_noise
+            map_counts = map_use + sky_counts + dark_current_total
+            map_counts = jnp.repeat(map_counts[:, :, np.newaxis], 10, axis=2)
+            map_observed = jax.random.poisson(key=subkey2,lam=map_counts) - sky_counts - dark_current_total
 
-            face_out = face_out + jnp.sum(map_face_observed + rdnoise_map, axis=-1)
-            edge_out = edge_out + jnp.sum(map_edge_observed + rdnoise_map, axis=-1)
+            map_out = map_out + jnp.sum(map_observed + rdnoise_map, axis=-1)
         if verbose:
             print('Combining individual exposures.')
-        self.map_edge_observed = edge_out / n_exposures 
-        self.map_face_observed = face_out / n_exposures
+        self.map_observed = map_out / n_exposures 
 
         if seeing_fwhm is not None:
-            self.map_edge_observed = self.apply_seeing(self.map_edge_observed,seeing_fwhm)
-            self.map_face_observed = self.apply_seeing(self.map_face_observed,seeing_fwhm)
-        # Calculate the SNR analytically 
-        self.SNR_face = map_face / np.sqrt(map_face+sky_counts+dark_current_total+self.read_noise**2)
-        self.SNR_edge = map_edge / np.sqrt(map_edge+sky_counts+dark_current_total+self.read_noise**2)
-        self.photon_to_readnoise_ratio = np.sqrt(map_edge+sky_counts) / (2*self.read_noise)
+            self.map_observed = self.apply_seeing(self.map_observed,seeing_fwhm)
+
     
     def plot_SNR(self,plot_re_multiples=None,
                             plot_rvir=False,
