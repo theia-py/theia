@@ -160,6 +160,7 @@ class SBMap():
         fig, ax: `matplotlib.figure`, `matplotlib.axes`
             the figure and axes objects for further manipulation.
         """
+        distance = check_units(distance,'Mpc')
         if vmin is None:
             vmin = np.mean(self.map) - np.std(self.map)
         if vmax is None:
@@ -366,7 +367,9 @@ class SBMap():
             simulation can take a while as it involves reprojection and a lot of RNG. Print steps along the way.
         """
         exptime = check_units(exptime,'s')
+        self.exptime = exptime
         distance = check_units(distance,'Mpc')
+        self.distance=distance
         self.storage['exptime'] = f'{exptime}'
         self.storage['D'] = f'{distance}'
         
@@ -401,7 +404,6 @@ class SBMap():
         
         
     def simulate_images(self,
-                        exptime: int,
                         n_exposures:int,
                         radii:bool=True,
                         verbose:bool=True,
@@ -414,12 +416,11 @@ class SBMap():
             key = jax.random.PRNGKey(seed)
         else:
             key =jax.random.PRNGKey(0)
-        distance = self.storage['D']*u.Mpc 
         pixel_scale = self.pixel_scale 
         if radii:
-            hmr_in_arcsec = get_angular_extent(self.hmr*2.0,distance).to(u.arcsec).value/2.0
+            hmr_in_arcsec = get_angular_extent(self.hmr*2.0,self.distance).to(u.arcsec).value/2.0
             self.hmr_in_pix = hmr_in_arcsec / pixel_scale 
-            rvir_in_arcsec = get_angular_extent(self.rvir*2.0,distance).to(u.arcsec).value/2.0
+            rvir_in_arcsec = get_angular_extent(self.rvir*2.0,self.distance).to(u.arcsec).value/2.0
             self.rvir_in_pix = rvir_in_arcsec / pixel_scale     
         
         if verbose:
@@ -427,14 +428,14 @@ class SBMap():
         if use_sky_spectrum:
             sky_counts = calculate_sky_counts(self.lam_eff,
                                             self.filter_bandpass,
-                                            exptime*u.s,
+                                            self.exptime*u.s,
                                             pixel_scale=self.pixel_scale*u.arcsec,
                                             effective_area=self.area
                                             )
         else:
             if sky_magnitude is not None:
                 sky_counts = mags_to_counts(sky_magnitude,
-                                            exptime*u.s,
+                                            self.exptime,
                                             self.pixel_scale*(u.arcsec/u.pixel),
                                             self.area,
                                             self.efficiency,
@@ -446,7 +447,7 @@ class SBMap():
                 raise AssertionError('Either sky counts or sky mag must be provided if use spectrum is false.')
         map_use = self.reprojected_map
         map_out = jnp.zeros(map_use.shape)
-        dark_current_total = self.dark_current*exptime.value
+        dark_current_total = self.dark_current*self.exptime.value
         
         for i in tqdm(range(int(n_exposures/10))):
             key, subkey = jax.random.split(key)
