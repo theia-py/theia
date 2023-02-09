@@ -333,9 +333,6 @@ class SBMap():
     def reproject_on_detector(self,
                     distance,
                     exptime,
-                    crop=False,
-                    detector_dims=(3000,3000),
-                    resampling='adaptive',
                     verbose=False,
                     ):
         """
@@ -363,18 +360,17 @@ class SBMap():
         verbose: bool, default: False
             simulation can take a while as it involves reprojection and a lot of RNG. Print steps along the way.
         """
-        self.detector_dims = detector_dims
-        self.to_crop = crop 
         exptime = check_units(exptime,'s')
         distance = check_units(distance,'Mpc')
         self.storage['exptime'] = f'{exptime}'
-        #self.storage['nexp'] = f'{n_exposures}'
         self.storage['D'] = f'{distance}'
-        self.storage['sampling'] = resampling 
         
         
         pixel_scale = self.pixel_scale
         boxwidth = get_angular_extent(self.boxwidth,distance).to(u.arcsec).value
+        n_pix_needed = int(boxwidth / self.pixel_scale) 
+        detector_dims = (n_pix_needed,n_pix_needed)
+
         current_pixel_scale = (boxwidth*u.arcsec) / (self.map_edge.shape[0]*u.pixel)
         desired_pixel_scale = pixel_scale*u.arcsec / u.pixel 
         self.boxwidth_in_pix = ((boxwidth*u.arcsec) / desired_pixel_scale).value
@@ -390,15 +386,12 @@ class SBMap():
         output_wcs.wcs.cdelt = -desired_pixel_scale.value, desired_pixel_scale.value
         
         #Modify maps into counts
-        map_edge= self.convert_maps_to_counts(self.map_edge,exptime)*self.efficiency
-        map_face = self.convert_maps_to_counts(self.map_face,exptime)*self.efficiency
+        map_use= self.convert_maps_to_counts(self.map_face,exptime)*self.efficiency
         
         if verbose:
             print('Reprojecting onto DSLM pixel scale.')
-        if resampling=='interp':
-            self.reprojected_edge = reproject_interp((map,input_wcs),output_wcs,shape_out=detector_dims)
-        elif resampling == 'adaptive':
-            self.reprojected_edge = reproject_adaptive((map,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
+
+        self.reprojected_edge = reproject_adaptive((map_use,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
         
         
         
