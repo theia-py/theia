@@ -104,9 +104,9 @@ class SBMap():
         box_half = self.boxwidth / 2.0
         box_half = box_half.value
         if scale=='log':
-            im0 = ax[0].imshow(self.map,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
+            im0 = ax.imshow(self.map,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
         elif scale=='linear':
-            im0 = ax[0].imshow(self.map,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-box_half,box_half,-box_half,box_half])
+            im0 = ax.imshow(self.map,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-box_half,box_half,-box_half,box_half])
 
         ax1_divider = make_axes_locatable(ax)
         cax1 = ax1_divider.append_axes("right", size="7%", pad="2%")
