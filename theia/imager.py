@@ -490,17 +490,15 @@ class SBMap():
         fig, ax: `matplotlib.figure`, `matplotlib.axes`
             the figure and axes objects for further manipulation.
         """
-        map_edge = copy.deepcopy(self.map_edge_observed)
-        map_face = copy.deepcopy(self.map_face_observed)
+        map_plot = copy.deepcopy(self.map_observed)
         
         if binning_factor is not None:
-            map_edge = block_reduce(map_edge, block_size=(binning_factor, binning_factor), func=np.mean)
-            map_face = block_reduce(map_face, block_size=(binning_factor, binning_factor), func=np.mean)
+            map_plot = block_reduce(map_plot, block_size=(binning_factor, binning_factor), func=np.mean)
         
         if vmin is None:
-            vmin = np.mean(map_edge) - np.std(map_edge)
+            vmin = np.mean(map_plot) - np.std(map_plot)
         if vmax is None:
-            vmax = np.mean(map_edge) + np.std(map_edge)
+            vmax = np.mean(map_plot) + np.std(map_plot)
         bb_context = plt.rc_context({'axes.edgecolor':'white', 'xtick.color':'white', 'ytick.color':'white', 'figure.facecolor':'black'})
         wb_context = plt.rc_context({'axes.edgecolor':'black', 'xtick.color':'black', 'ytick.color':'black', 'figure.facecolor':'white'})
         if context=='black':
@@ -508,71 +506,51 @@ class SBMap():
         else:
             cont = wb_context
         with cont:
-            fig, ax = plt.subplots(1,2,figsize=(21.5,10))
-            ax[0].set_aspect(1)
-            if self.to_crop == False:
-                minx = - self.detector_dims[0]/2.0 
-                maxx = self.detector_dims[0]/2.0 
-                miny = -self.detector_dims[1]/2.0 
-                maxy = self.detector_dims[1]/2.0 
-            # else:
-            #     minx = -self.box_half
-            #     maxx = self.box_half
-            #     miny = -self.box_half 
-            #     maxy = self.box_half
-            if self.to_crop:
-                im0 = ax[0].imshow(map_edge,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-self.box_half,self.box_half,-self.box_half,self.box_half])
-                im1 = ax[1].imshow(map_face,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-self.box_half,self.box_half,-self.box_half,self.box_half])
-            else:
-                im0 = ax[0].imshow(map_edge,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[minx,maxx,miny,maxy])
-                im1 = ax[1].imshow(map_face,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[minx,maxx,miny,maxy])
-            ax[1].set_aspect(1)
-            ax1_divider = make_axes_locatable(ax[1])
+            fig, ax = plt.subplots(figsize=(15,15))
+            ax.set_aspect(1)
+            minx = -self.box_half
+            maxx = self.box_half
+            miny = -self.box_half 
+            maxy = self.box_half
+
+            im0 = ax.imshow(map_plot,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[minx,maxx,miny,maxy])
+            ax1_divider = make_axes_locatable(ax)
             cax1 = ax1_divider.append_axes("right", size="7%", pad="2%")
-            cb1 = fig.colorbar(im1, cax=cax1)
+            cb1 = fig.colorbar(im0, cax=cax1)
             if context =='black':
                 cb1.set_label(r"Counts in exptime",fontsize=22,color='white')
             else:
                 cb1.set_label(r"Counts in exptime",fontsize=22,color='black')
-            plt.subplots_adjust(wspace=0.0)
-            ax[1].set_yticks([])
-            #ax[1].set_xticks([-200,-100,0,100,200])
-            ax[1].set_yticklabels([])
-            cax1.tick_params(labelsize=20)
-            ax[0].tick_params(labelsize=20)
-            ax[1].tick_params(labelsize=20)
 
-            ax[0].set_ylabel('size [pixels]',fontsize=22)
-            ax[1].set_xlabel('size [pixels]',fontsize=22)
-            ax[0].set_xlabel('size [pixels]',fontsize=22)
+            cax1.tick_params(labelsize=20)
+            ax.tick_params(labelsize=20)
+
+            ax.set_ylabel('size [pixels]',fontsize=22)
+            ax.set_xlabel('size [pixels]',fontsize=22)
             
 
             
             if plot_re_multiples is not None:
-                plot_circle(r=self.hmr_in_pix,ax=ax[0],color='w')
-                plot_circle(r=self.hmr_in_pix,ax=ax[1],color='w')
+                plot_circle(r=self.hmr_in_pix,ax=ax,color='w')
                 for i in plot_re_multiples:
-                    plot_circle(r=i*self.hmr_in_pix,ax=ax[0],color='w')
-                    plot_circle(r=i*self.hmr_in_pix,ax=ax[1],color='w')
+                    plot_circle(r=i*self.hmr_in_pix,ax=ax,color='w')
             if plot_rvir:
-                plot_circle(r=self.rvir_in_pix,ax=ax[0],color='k')
-                plot_circle(r=self.rvir_in_pix,ax=ax[1],color='k')
+                plot_circle(r=self.rvir_in_pix,ax=ax,color='k')
 
-            if self.to_crop:
-                for i in ax:
-                    i.set_xlim(-self.box_half,self.box_half)
-                    i.set_ylim(-self.box_half,self.box_half)
-            for i in ax:   
-                if context == 'black':
-                    i.xaxis.label.set_color('white')
-                    i.yaxis.label.set_color('white')
+
+            ax.set_xlim(-self.box_half,self.box_half)
+            ax.set_ylim(-self.box_half,self.box_half)
+
+            if context == 'black':
+                ax.xaxis.label.set_color('white')
+                ax.yaxis.label.set_color('white')
 
             if overlay_properties:
                 if hasattr(self,'gal_props'):
                     rect = FancyBboxPatch((0.65, 0.025), 0.33,0.18, boxstyle="round,pad=0.01",linewidth=1, edgecolor='k', facecolor='white',transform=ax[1].transAxes,zorder=10,alpha=0.85)
-                    ax[1].add_patch(rect)
-                    ax[1].text(0.95,0.15,rf"log $M_*$: {self.gal_props['subhalo_stellar_mass']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
-                    ax[1].text(0.95,0.05,rf"$R_{{vir}}$: {self.gal_props['rvir']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
+                    ax.add_patch(rect)
+                    ax.text(0.95,0.15,rf"log $M_*$: {self.gal_props['subhalo_stellar_mass']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
+                    ax.text(0.95,0.05,rf"$R_{{vir}}$: {self.gal_props['rvir']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
 
             return fig, ax
     def save_fits(self,fname,binning_factor=None):
