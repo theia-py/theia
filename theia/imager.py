@@ -69,11 +69,10 @@ class SBMap():
         return im.value
         
 
-    def add_images(self,image_face,image_edge,box_length_kpc,rvir=None,stellar_hmr=None):
+    def add_images(self,image,box_length_kpc,rvir=None,stellar_hmr=None):
         self.rvir = rvir 
         self.hmr = stellar_hmr 
-        self.map_edge = image_edge 
-        self.map_face = image_face 
+        self.map = image
         self.boxwidth=check_units(box_length_kpc,'kpc')
 
     def plot_map(self,scale='log',plot_re_multiples=None,plot_rvir=False,vmin=5e-14,vmax=5e-6):
@@ -96,8 +95,8 @@ class SBMap():
         fig, ax: `matplotlib.figure`, `matplotlib.axes`
             the figure and axes objects for further manipulation.
         """
-        fig, ax = plt.subplots(1,2,figsize=(21.5,10))
-        ax[0].set_aspect(1)
+        fig, ax = plt.subplots(figsize=(15,15))
+        ax.set_aspect(1)
         if vmin is None:
             vmin = np.mean(self.map_edge) - 2*np.std(self.map_edge)
         if vmax is None:
@@ -105,44 +104,32 @@ class SBMap():
         box_half = self.boxwidth / 2.0
         box_half = box_half.value
         if scale=='log':
-            im0 = ax[0].imshow(self.map_edge,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
-            im1 = ax[1].imshow(self.map_face,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
+            im0 = ax[0].imshow(self.map,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
         elif scale=='linear':
-            im0 = ax[0].imshow(self.map_edge,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-box_half,box_half,-box_half,box_half])
-            im1 = ax[1].imshow(self.map_face,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-box_half,box_half,-box_half,box_half])
+            im0 = ax[0].imshow(self.map,origin='lower',cmap='gray_r',vmin=vmin,vmax=vmax,extent=[-box_half,box_half,-box_half,box_half])
 
-        ax[1].set_aspect(1)
-        ax1_divider = make_axes_locatable(ax[1])
+        ax1_divider = make_axes_locatable(ax)
         cax1 = ax1_divider.append_axes("right", size="7%", pad="2%")
-        cb1 = fig.colorbar(im1, cax=cax1)
+        cb1 = fig.colorbar(im0, cax=cax1)
         cb1.set_label(r"Surface Brightness [photon s$^{-1}$ cm$^{-2}$ arcsec$^{-2}$]",fontsize=22)
         plt.subplots_adjust(wspace=0.0)
-        ax[1].set_yticks([])
-        #ax[1].set_xticks([-200,-100,0,100,200])
-        ax[1].set_yticklabels([])
+        ax.set_yticks([])
+        ax.set_yticklabels([])
         cax1.tick_params(labelsize=20)
-        ax[0].tick_params(labelsize=20)
-        ax[1].tick_params(labelsize=20)
-
-        ax[0].set_ylabel('size [kpc]',fontsize=22)
-        ax[1].set_xlabel('size [kpc]',fontsize=22)
-        ax[0].set_xlabel('size [kpc]',fontsize=22)
-        
-
+        ax.tick_params(labelsize=20)
+        ax.set_ylabel('size [kpc]',fontsize=22)
+        ax.set_xlabel('size [kpc]',fontsize=22)
         
         if plot_re_multiples is not None:
-            plot_circle(r=self.hmr,ax=ax[0],color='w')
-            plot_circle(r=self.hmr,ax=ax[1],color='w')
+            plot_circle(r=self.hmr,ax=ax,color='w')
             for i in plot_re_multiples:
-                plot_circle(r=i*self.hmr,ax=ax[0],color='w')
-                plot_circle(r=i*self.hmr,ax=ax[1],color='w')
+                plot_circle(r=i*self.hmr,ax=ax,color='w')
         if plot_rvir:
-            plot_circle(r=self.rvir,ax=ax[0],color='k')
-            plot_circle(r=self.rvir,ax=ax[1],color='k')
+            plot_circle(r=self.rvir,ax=ax,color='k')
 
-        for i in ax:
-            i.set_xlim(-box_half,box_half)
-            i.set_ylim(-box_half,box_half)
+
+        ax.set_xlim(-box_half,box_half)
+        ax.set_ylim(-box_half,box_half)
         return fig, ax
     
     def on_sky(self,distance,plot_re_multiples=None,plot_rvir=False,vmin=5e-14,vmax=5e-6,context='white'):
