@@ -355,20 +355,14 @@ class SBMap():
                             normalize_kernel=True)
         return image
 
-    def simulate_on_detector(self,
+    def reproject_on_detector(self,
                     distance,
                     exptime,
-                    n_exposures,
-                    seeing_fwhm=None,
                     crop=False,
                     detector_dims=(3000,3000),
-                    resampling='interp',
-                    seed=None,
-                    use_sky_spectrum=True,
-                    sky_magnitude=None,
-                    sky_counts = None,
+                    resampling='adaptive',
                     verbose=False,
-                    radii=False):
+                    ):
         """
         Simulate the image that would be detected by the telescope. 
 
@@ -399,14 +393,66 @@ class SBMap():
         exptime = check_units(exptime,'s')
         distance = check_units(distance,'Mpc')
         self.storage['exptime'] = f'{exptime}'
-        self.storage['nexp'] = f'{n_exposures}'
+        #self.storage['nexp'] = f'{n_exposures}'
         self.storage['D'] = f'{distance}'
         self.storage['sampling'] = resampling 
         
+        
+        pixel_scale = self.pixel_scale
+        boxwidth = get_angular_extent(self.boxwidth,distance).to(u.arcsec).value
+        current_pixel_scale = (boxwidth*u.arcsec) / (self.map_edge.shape[0]*u.pixel)
+        desired_pixel_scale = pixel_scale*u.arcsec / u.pixel 
+        self.boxwidth_in_pix = ((boxwidth*u.arcsec) / desired_pixel_scale).value
+        
+        
+        self.box_half = self.boxwidth_in_pix / 2.0
+        input_wcs = WCS(naxis=2)
+        input_wcs.wcs.crpix = 0,0
+        input_wcs.wcs.cdelt = -current_pixel_scale.value, current_pixel_scale.value
+
+        output_wcs = WCS(naxis=2)
+        output_wcs.wcs.crpix = 0,0
+        output_wcs.wcs.cdelt = -desired_pixel_scale.value, desired_pixel_scale.value
+        
+        #Modify maps into counts
+        map_edge= self.convert_maps_to_counts(self.map_edge,exptime)*self.efficiency
+        map_face = self.convert_maps_to_counts(self.map_face,exptime)*self.efficiency
+        
+        if verbose:
+            print('Reprojecting onto DSLM pixel scale.')
+        if resampling=='interp':
+            self.reprojected_edge = reproject_interp((map_edge,input_wcs),output_wcs,shape_out=detector_dims)
+            self.reprojected_face = reproject_interp((map_face,input_wcs),output_wcs,shape_out=detector_dims)
+        elif resampling == 'adaptive':
+            self.reprojected_edge = reproject_adaptive((map_edge,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
+            self.reprojected_face = reproject_adaptive((map_face,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest')
+        
+        
+        
+    def simulate_images(self,
+                        exptime: int,
+                        n_exposures:int,
+                        radii:bool=True,
+                        verbose:bool=True,
+                        use_sky_spectrum=True,
+                        sky_magnitude = None,
+                        sky_counts = None,
+                        seeing_fwhm=None,
+                        seed=None):
         if seed is not None:
             key = jax.random.PRNGKey(seed)
         else:
             key =jax.random.PRNGKey(0)
+        distance = self.storage['D']*u.Mpc 
+        pixel_scale = self.pixel_scale 
+        if radii:
+            hmr_in_arcsec = get_angular_extent(self.hmr*2.0,distance).to(u.arcsec).value/2.0
+            self.hmr_in_pix = hmr_in_arcsec / pixel_scale 
+            rvir_in_arcsec = get_angular_extent(self.rvir*2.0,distance).to(u.arcsec).value/2.0
+            self.rvir_in_pix = rvir_in_arcsec / pixel_scale     
+        
+        if verbose:
+            print('Sampling noise.')
         if use_sky_spectrum:
             sky_counts = calculate_sky_counts(self.lam_eff,
                                             self.filter_bandpass,
@@ -427,74 +473,8 @@ class SBMap():
                 sky_counts = sky_counts
             else: 
                 raise AssertionError('Either sky counts or sky mag must be provided if use spectrum is false.')
-        self.sky_counts_per_pixel = sky_counts 
-        pixel_scale = self.pixel_scale
-        boxwidth = get_angular_extent(self.boxwidth,distance).to(u.arcsec).value
-        current_pixel_scale = (boxwidth*u.arcsec) / (self.map_edge.shape[0]*u.pixel)
-        desired_pixel_scale = pixel_scale*u.arcsec / u.pixel 
-        self.boxwidth_in_pix = ((boxwidth*u.arcsec) / desired_pixel_scale).value
-        if radii:
-            hmr_in_arcsec = get_angular_extent(self.hmr*2.0,distance).to(u.arcsec).value/2.0
-            self.hmr_in_pix = hmr_in_arcsec / pixel_scale 
-            rvir_in_arcsec = get_angular_extent(self.rvir*2.0,distance).to(u.arcsec).value/2.0
-            self.rvir_in_pix = rvir_in_arcsec / pixel_scale 
-        
-        self.box_half = self.boxwidth_in_pix / 2.0
-        input_wcs = WCS(naxis=2)
-        input_wcs.wcs.crpix = 0,0
-        input_wcs.wcs.cdelt = -current_pixel_scale.value, current_pixel_scale.value
-
-        output_wcs = WCS(naxis=2)
-        output_wcs.wcs.crpix = 0,0
-        output_wcs.wcs.cdelt = -desired_pixel_scale.value, desired_pixel_scale.value
-        
-        #Modify maps into counts
-        map_edge= self.convert_maps_to_counts(self.map_edge,exptime)*self.efficiency
-        map_face = self.convert_maps_to_counts(self.map_face,exptime)*self.efficiency
-        
-        if verbose:
-            print('Reprojecting onto DSLM pixel scale.')
-        if resampling=='interp':
-            edge = reproject_interp((map_edge,input_wcs),output_wcs,shape_out=detector_dims)
-            face = reproject_interp((map_face,input_wcs),output_wcs,shape_out=detector_dims)
-        elif resampling == 'adaptive':
-            edge = reproject_adaptive((map_edge,input_wcs),output_wcs,shape_out=detector_dims)
-            face = reproject_adaptive((map_face,input_wcs),output_wcs,shape_out=detector_dims)
-        
-        if crop:
-            if verbose:
-                print('Cropping.')
-            flat = edge[0][~np.isnan(edge[0])]
-            length = len(flat)
-            sq_size = int(np.sqrt(length))
-            map_edge = flat.reshape((sq_size,sq_size))
-            flat2 = face[0][~np.isnan(face[0])]
-            map_face = flat2.reshape((sq_size,sq_size))
-        else:
-            flat = edge[0][~np.isnan(edge[0])]
-            length = len(flat)
-            sq_size = int(np.sqrt(length))
-            map_edge = flat.reshape((sq_size,sq_size))
-            flat2 = face[0][~np.isnan(face[0])]
-            map_face = flat2.reshape((sq_size,sq_size))
-            insert_face = np.zeros(detector_dims)
-            insert_edge = np.zeros(detector_dims)
-            start = int(detector_dims[0]/2.0) - int(sq_size/2.0)
-            end =  start + sq_size 
-            insert_face[start:end,start:end] = map_face 
-            insert_edge[start:end,start:end] = map_edge 
-            map_face = insert_face 
-            map_edge = insert_edge
-        #sky_noise_scale = np.sqrt(sky_level)
-        #sky_noise = np.random.normal(loc=0,scale=sky_noise_scale,size=map_edge.shape)
-        map_face = jnp.array(map_face)
-        map_edge = jnp.array(map_edge)
-
-        # Add sky noise, read noise, etc. 
-        if verbose:
-            print('Sampling noise.')
-        
-
+        map_face = self.reprojected_face 
+        map_edge = self.reprojected_edge 
         face_out = jnp.zeros(map_face.shape)
         edge_out = jnp.zeros(map_edge.shape)
         dark_current_total = self.dark_current*exptime.value
@@ -524,6 +504,7 @@ class SBMap():
         self.SNR_face = map_face / np.sqrt(map_face+sky_counts+dark_current_total+self.read_noise**2)
         self.SNR_edge = map_edge / np.sqrt(map_edge+sky_counts+dark_current_total+self.read_noise**2)
         self.photon_to_readnoise_ratio = np.sqrt(map_edge+sky_counts) / (2*self.read_noise)
+    
     def plot_SNR(self,plot_re_multiples=None,
                             plot_rvir=False,
                             vmin=None,
