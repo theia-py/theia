@@ -399,7 +399,7 @@ class SBMap():
         if verbose:
             print('Reprojecting onto DSLM pixel scale.')
 
-        self.reprojected_map = reproject_adaptive((map_use,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest',return_footprint=False)
+        self.reprojected_map = reproject_adaptive((map_use,input_wcs),output_wcs,shape_out=detector_dims,conserve_flux=True,boundary_mode='nearest',return_footprint=False,kernel='gaussian')
         
         
         
