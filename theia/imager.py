@@ -376,7 +376,7 @@ class SBMap():
         n_pix_needed = int(boxwidth / self.pixel_scale) 
         detector_dims = (n_pix_needed,n_pix_needed)
 
-        current_pixel_scale = (boxwidth*u.arcsec) / (self.map_edge.shape[0]*u.pixel)
+        current_pixel_scale = (boxwidth*u.arcsec) / (self.map.shape[0]*u.pixel)
         desired_pixel_scale = pixel_scale*u.arcsec / u.pixel 
         self.boxwidth_in_pix = ((boxwidth*u.arcsec) / desired_pixel_scale).value
         
