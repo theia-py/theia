@@ -171,53 +171,41 @@ class SBMap():
         else:
             cont = wb_context
         with cont:
-            fig, ax = plt.subplots(1,2,figsize=(21.5,10))
-            ax[0].set_aspect(1)
+            fig, ax = plt.subplots(figsize=(15,15))
+            ax.set_aspect(1)
             
             
-            im0 = ax[0].imshow(self.map_edge,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
-            im1 = ax[1].imshow(self.map_face,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
+            im0 = ax.imshow(self.map,origin='lower',cmap='gray_r',norm=LogNorm(vmin=vmin,vmax=vmax),extent=[-box_half,box_half,-box_half,box_half])
 
-            ax[1].set_aspect(1)
-            ax1_divider = make_axes_locatable(ax[1])
+
+            ax1_divider = make_axes_locatable(ax)
             cax1 = ax1_divider.append_axes("right", size="7%", pad="2%")
-            cb1 = fig.colorbar(im1, cax=cax1)
+            cb1 = fig.colorbar(im0, cax=cax1)
             if context=='black':
                 cb1.set_label(r"Surface Brightness [photon s$^{-1}$ cm$^{-2}$ arcsec$^{-2}$]",fontsize=22,color='white')
             else:
                 cb1.set_label(r"Surface Brightness [photon s$^{-1}$ cm$^{-2}$ arcsec$^{-2}$]",fontsize=22,color='black')
             plt.subplots_adjust(wspace=0.0)
-            ax[1].set_yticks([])
-            #ax[1].set_xticks([-200,-100,0,100,200])
-            ax[1].set_yticklabels([])
+
             cax1.tick_params(labelsize=20)
-            ax[0].tick_params(labelsize=20)
-            ax[1].tick_params(labelsize=20)
+            ax.tick_params(labelsize=20)
 
-            ax[0].set_ylabel('size [arcmin]',fontsize=22)
-            ax[1].set_xlabel('size [arcmin]',fontsize=22)
-            ax[0].set_xlabel('size [arcmin]',fontsize=22)
-            
-
-            
+            ax.set_ylabel('size [arcmin]',fontsize=22)
+            ax.set_xlabel('size [arcmin]',fontsize=22)
+                        
             if plot_re_multiples is not None:
                 hmr_in_pix = get_angular_extent(self.hmr*2,distance).value /2.0
                 rvir_in_pix = get_angular_extent(self.rvir*2,distance).value/2.0 
-                plot_circle(r=hmr_in_pix,ax=ax[0],color='w')
-                plot_circle(r=hmr_in_pix,ax=ax[1],color='w')
+                plot_circle(r=hmr_in_pix,ax=ax,color='w')
                 for i in plot_re_multiples:
-                    plot_circle(r=i*hmr_in_pix,ax=ax[0],color='w')
-                    plot_circle(r=i*hmr_in_pix,ax=ax[1],color='w')
+                    plot_circle(r=i*hmr_in_pix,ax=ax,color='w')
             if plot_rvir:
                 plot_circle(r=rvir_in_pix,ax=ax[0],color='k')
-                plot_circle(r=rvir_in_pix,ax=ax[1],color='k')
-
-            for i in ax:
-                i.set_xlim(-box_half,box_half)
-                i.set_ylim(-box_half,box_half)
-                if context == 'black':
-                    i.xaxis.label.set_color('white')
-                    i.yaxis.label.set_color('white')
+            ax.set_xlim(-box_half,box_half)
+            ax.set_ylim(-box_half,box_half)
+            if context == 'black':
+                ax.xaxis.label.set_color('white')
+                ax.yaxis.label.set_color('white')
 
             return fig, ax
     def setup_instrument(self,
