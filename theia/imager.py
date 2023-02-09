@@ -547,10 +547,10 @@ class SBMap():
 
             if overlay_properties:
                 if hasattr(self,'gal_props'):
-                    rect = FancyBboxPatch((0.65, 0.025), 0.33,0.18, boxstyle="round,pad=0.01",linewidth=1, edgecolor='k', facecolor='white',transform=ax[1].transAxes,zorder=10,alpha=0.85)
+                    rect = FancyBboxPatch((0.65, 0.025), 0.33,0.18, boxstyle="round,pad=0.01",linewidth=1, edgecolor='k', facecolor='white',transform=ax.transAxes,zorder=10,alpha=0.85)
                     ax.add_patch(rect)
-                    ax.text(0.95,0.15,rf"log $M_*$: {self.gal_props['subhalo_stellar_mass']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
-                    ax.text(0.95,0.05,rf"$R_{{vir}}$: {self.gal_props['rvir']:.2f}",color='k',fontsize=20,transform=ax[1].transAxes,ha='right',zorder=11)
+                    ax.text(0.95,0.15,rf"log $M_*$: {self.gal_props['subhalo_stellar_mass']:.2f}",color='k',fontsize=20,transform=ax.transAxes,ha='right',zorder=11)
+                    ax.text(0.95,0.05,rf"$R_{{vir}}$: {self.gal_props['rvir']:.2f}",color='k',fontsize=20,transform=ax.transAxes,ha='right',zorder=11)
 
             return fig, ax
     def save_fits(self,fname,binning_factor=None):
