@@ -60,7 +60,7 @@ class SBMap():
             self.boxwidth = 2.0*self.rvir 
             self.hmr = check_units(self.gal_props['stellar_hmr'],'kpc')
         if orientation =='face':
-            self.map = map_edge 
+            self.map = map_face 
         elif orientation == 'edge':
             self.map = map_edge
 
