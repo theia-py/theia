@@ -49,15 +49,20 @@ class SBMap():
         """
         pass 
 
-    def load_TNG50(self,fof_group,line,fof_path,cat_path):
+    def load_TNG50(self,fof_group,line,fof_path,cat_path,orientation='face'):
         self.fof_group = fof_group 
-        self.map_edge, self.map_face = load_TNG_galaxy(fof_group,line,fof_path=fof_path)
+        map_edge, map_face = load_TNG_galaxy(fof_group,line,fof_path=fof_path)
+
         with asdf.open(cat_path) as af:
             self.gal_props = af.tree[fof_group]
             print(self.gal_props)
             self.rvir = self.gal_props['rvir']
             self.boxwidth = 2.0*self.rvir 
             self.hmr = self.gal_props['stellar_hmr']
+        if orientation =='face':
+            self.map = map_edge 
+        elif orientation == 'edge':
+            self.map = map_edge
 
     def convert_energy_to_photon(self,image,wavelength_emit):
         wavelength_emit = check_units(wavelength_emit,'angstrom')
