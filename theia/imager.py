@@ -18,7 +18,7 @@ import matplotlib
 from .mags_to_counts import mags_to_counts
 from skimage.measure import block_reduce
 matplotlib.rcParams['axes.linewidth'] = 1.5 #set the value globally
-from reproject import reproject_adaptive, reproject_interp
+from reproject import reproject_adaptive
 from astropy.wcs import WCS
 
 import copy 
