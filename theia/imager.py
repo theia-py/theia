@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy import constants
 
+from typing import Union 
 
 from astropy import units as u
 from matplotlib.colors import LogNorm
@@ -64,7 +65,12 @@ class SBMap():
         elif orientation == 'edge':
             self.map = map_edge
 
-    def convert_energy_to_photon(self,image,wavelength_emit):
+    def convert_energy_to_photon(self,
+                                image: np.array_like,
+                                wavelength_emit: Union[float,u.Quantity]):
+        """
+        Convert an image in erg/s/cm2/arcsec2 --> photon/s/cm2/arcsec2
+        """
         wavelength_emit = check_units(wavelength_emit,'angstrom')
         im = image * u.erg/u.s/u.cm**2/u.arcsec**2 
         photon_energy = constants.h * constants.c / (wavelength_emit)
@@ -103,9 +109,9 @@ class SBMap():
         fig, ax = plt.subplots(figsize=(15,15))
         ax.set_aspect(1)
         if vmin is None:
-            vmin = np.mean(self.map_edge) - 2*np.std(self.map_edge)
+            vmin = np.mean(self.map) - 2*np.std(self.map)
         if vmax is None:
-            vmax = np.mean(self.map_edge) + 2*np.std(self.map_edge)
+            vmax = np.mean(self.map) + 2*np.std(self.map)
         box_half = self.boxwidth / 2.0
         box_half = box_half.value
         if scale=='log':
@@ -215,44 +221,45 @@ class SBMap():
 
             return fig, ax
     def setup_instrument(self,
-                        optical_diameter,
-                        pixel_scale,
-                        source_velocity,
-                        emission_wl,
-                        read_noise,
-                        efficiency,
-                        dark_current,
-                        filter_bandpass=8*u.angstrom,
+                        optical_diameter: Union[float,u.Quantity],
+                        filter_bandpass: Union[float,u.Quantity],
+                        pixel_scale: Union[float,u.Quantity],
+                        source_velocity: Union[float,u.Quantity],
+                        emission_wl: Union[float,u.Quantity],
+                        read_noise: float,
+                        efficiency: float = 1.0,
+                        dark_current: float = 0.0,
                         **kwargs):
         """
         Setup an instrument by providing all of the relevant details about it.
 
         Parameters
         ----------
-        optical_diameter: int or `~astropy.units.Quantity`
-            diameter of the optical system being used, in meters.
-        pixel_scale: float
-            pixel scale in arcsec/pixel (e.g., 2.1).
-        source_velocity: float
-            velocity of the source (in km/s). Our filters will go from 0 to 4500 km/s, but the code
-            will not stop you from entering any particular value. This parameter sets the lambda_eff
-            of the bandpass, which controls the sky level when using UVES spectrum. 
+        optical_diameter: float or `~astropy.units.Quantity`
+            diameter of the optical system being used. If no unit supplied, assumed to be in meters.
+        filter_bandpass: float or `~astropy.units.Quantity`
+            filter bandpass as an astropy length quantity. If no unit supplied, assumed angstrom.
+        pixel_scale: float or `~astropy.units.Quantity`
+            pixel scale in arcsec/pixel.
+        source_velocity: float or `~astropy.units.Quantity`
+            recession velocity of the source. If no unit supplied, assumed to be km/s.
         emission_wl: float or `~astropy.units.Quantity`
             intrinsic emission wavelength of the line in the map you are using in Angstrom. E.g., for H-alpha this
             would be 65652.3. This plus the source velocity sets the ultimate bandpass location.
         read_noise: float
             read noise of the detector in e-. 
-        efficiency: float
+        efficiency: float, default: 1.0
             quantum efficiency of the detector *at the wavelengths of interest*. Between 0 and 1. 
-        dark_current: float
+        dark_current: float, default: 0.0
             dark current in e- per second for the operating cooled detector. 
-        filter_bandpass: float or `~astropy.units.Quantity`, default: 8*u.angstrom
-            filter bandpass as an astropy length quantity (e.g., u.nm or u.angstrom, assumed angstrom)
+        
         
         """
         self.diameter = check_units(optical_diameter,'m')
-        self.pixel_scale= pixel_scale
         self.area = np.pi*(self.diameter/2.0)**2
+
+        self.pixel_scale= check_units(pixel_scale,'arcsec/pixel')
+        
         self.read_noise = read_noise
         self.efficiency = efficiency
         self.dark_current = dark_current
@@ -312,7 +319,7 @@ class SBMap():
         sb_map = sb_map * u.photon / u.s / u.cm**2 / u.arcsec**2 
         sb_map = sb_map * (exptime*u.s)
         sb_map = sb_map * self.area.to(u.cm**2)
-        sb_map = sb_map * (self.pixel_scale*u.arcsec)**2
+        sb_map = sb_map * (self.pixel_scale.value*u.arcsec)**2
         return sb_map 
     
     def apply_seeing(self,image,seeing_fwhm,boundary='center'):
