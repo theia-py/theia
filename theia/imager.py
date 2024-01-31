@@ -457,9 +457,9 @@ class SBMap():
         map_use = self.reprojected_map
         map_out = jnp.zeros(map_use.shape)
         dark_current_total = self.dark_current*self.exptime.value
-        fits_out = fits.HDUList([fits.PrimaryHDU(np.array(map_out))])
+        prim = fits.PrimaryHDU()
+        fits_out = fits.HDUList([prim])
         n_headers = 1
-        header_dict = {}
         for i in tqdm(range(int(n_exposures/10))):
             key, subkey = jax.random.split(key)
             key, subkey2 = jax.random.split(key)
@@ -475,17 +475,21 @@ class SBMap():
                 if seeing_fwhm is not None:
                     tmp = self.apply_seeing(tmp,seeing_fwhm)
                 tmp_hdu = fits.ImageHDU(tmp)
-                header_dict[f'HEADER {n_headers}'] = frame_num +10 
+                prim.header[f'HEADER {n_headers}'] = frame_num +10 
                 fits_out.append(tmp_hdu)
+                n_headers += 1
 
         if verbose:
             print('Combining individual exposures.')
         self.map_observed = map_out / n_exposures 
+        fits_out.append(fits.ImageHDU(self.map_observed))
+        prim.header[f'HEADER {n_headers}'] = 'FINAL'
 
         if seeing_fwhm is not None:
             self.map_observed = self.apply_seeing(self.map_observed,seeing_fwhm)
 
         print("writing out file")
+
         fits_out.writeto(file_out)
         print("File Written.")
 
