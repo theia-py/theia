@@ -475,7 +475,7 @@ class SBMap():
                 if seeing_fwhm is not None:
                     tmp = self.apply_seeing(tmp,seeing_fwhm)
                 tmp_hdu = fits.ImageHDU(tmp)
-                prim.header[f'HEADER {n_headers}'] = frame_num +10 
+                prim.header[f'HDR_{n_headers}'] = frame_num +10 
                 fits_out.append(tmp_hdu)
                 n_headers += 1
 
@@ -483,7 +483,7 @@ class SBMap():
             print('Combining individual exposures.')
         self.map_observed = map_out / n_exposures 
         fits_out.append(fits.ImageHDU(self.map_observed))
-        prim.header[f'HEADER {n_headers}'] = 'FINAL'
+        prim.header[f'HDR_{n_headers}'] = 'FINAL'
 
         if seeing_fwhm is not None:
             self.map_observed = self.apply_seeing(self.map_observed,seeing_fwhm)
