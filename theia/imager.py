@@ -457,8 +457,9 @@ class SBMap():
         map_use = self.reprojected_map
         map_out = jnp.zeros(map_use.shape)
         dark_current_total = self.dark_current*self.exptime.value
-        fits_out = fits.HDUList([fits.PrimaryHDU()])
-
+        fits_out = fits.HDUList([fits.PrimaryHDU(np.array(map_out))])
+        n_headers = 1
+        header_dict = {}
         for i in tqdm(range(int(n_exposures/10))):
             key, subkey = jax.random.split(key)
             key, subkey2 = jax.random.split(key)
@@ -468,12 +469,13 @@ class SBMap():
             map_observed = jax.random.poisson(key=subkey2,lam=map_counts) - sky_counts - dark_current_total
             map_out = map_out + jnp.sum(map_observed + rdnoise_map, axis=-1)
             frame_num = int(i*10) 
-            if frame_num % 1000 == 0:
+            if frame_num % 500 == 0:
                 # we will write out this frame 
-                tmp = jnp.copy(map_out) / i 
+                tmp = jnp.copy(map_out) / float(frame_num+10) 
                 if seeing_fwhm is not None:
                     tmp = self.apply_seeing(tmp,seeing_fwhm)
                 tmp_hdu = fits.ImageHDU(tmp)
+                header_dict[f'HEADER {n_headers}'] = frame_num +10 
                 fits_out.append(tmp_hdu)
 
         if verbose:
