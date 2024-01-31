@@ -476,6 +476,7 @@ class SBMap():
                     tmp = self.apply_seeing(tmp,seeing_fwhm)
                 tmp_hdu = fits.ImageHDU(tmp)
                 prim.header[f'HDR_{n_headers}'] = frame_num +10 
+                tmp_hdu.header['OBJECT'] = f'{frame_num +10} combine'
                 fits_out.append(tmp_hdu)
                 n_headers += 1
 
