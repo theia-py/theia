@@ -66,7 +66,7 @@ class SBMap():
             self.map = map_edge
 
     def convert_energy_to_photon(self,
-                                image: np.array_like,
+                                image: np.ndarray,
                                 wavelength_emit: Union[float,u.Quantity]):
         """
         Convert an image in erg/s/cm2/arcsec2 --> photon/s/cm2/arcsec2
