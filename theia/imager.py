@@ -412,13 +412,15 @@ class SBMap():
         
     def simulate_images(self,
                         n_exposures:int,
+                        file_out:str,
                         radii:bool=True,
                         verbose:bool=True,
                         use_sky_spectrum=True,
                         sky_magnitude = None,
                         sky_counts = None,
                         seeing_fwhm=None,
-                        seed=None):
+                        seed=None,
+                        ):
         if seed is not None:
             key = jax.random.PRNGKey(seed)
         else:
@@ -455,7 +457,8 @@ class SBMap():
         map_use = self.reprojected_map
         map_out = jnp.zeros(map_use.shape)
         dark_current_total = self.dark_current*self.exptime.value
-        
+        fits_out = fits.HDUList([fits.PrimaryHDU()])
+
         for i in tqdm(range(int(n_exposures/10))):
             key, subkey = jax.random.split(key)
             key, subkey2 = jax.random.split(key)
@@ -463,14 +466,26 @@ class SBMap():
             map_counts = map_use + sky_counts + dark_current_total
             map_counts = jnp.repeat(map_counts[:, :, np.newaxis], 10, axis=2)
             map_observed = jax.random.poisson(key=subkey2,lam=map_counts) - sky_counts - dark_current_total
-
             map_out = map_out + jnp.sum(map_observed + rdnoise_map, axis=-1)
+            frame_num = int(i*10) 
+            if frame_num % 1000 == 0:
+                # we will write out this frame 
+                tmp = jnp.copy(map_out) / i 
+                if seeing_fwhm is not None:
+                    tmp = self.apply_seeing(tmp,seeing_fwhm)
+                tmp_hdu = fits.ImageHDU(tmp)
+                fits_out.append(tmp_hdu)
+
         if verbose:
             print('Combining individual exposures.')
         self.map_observed = map_out / n_exposures 
 
         if seeing_fwhm is not None:
             self.map_observed = self.apply_seeing(self.map_observed,seeing_fwhm)
+
+        print("writing out file")
+        fits_out.writeto(file_out)
+        print("File Written.")
 
     
     def visualize_on_detector(self,
