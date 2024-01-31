@@ -413,6 +413,7 @@ class SBMap():
     def simulate_images(self,
                         n_exposures:int,
                         file_out:str,
+                        write_out_every=10000,
                         radii:bool=True,
                         verbose:bool=True,
                         use_sky_spectrum=True,
@@ -469,7 +470,7 @@ class SBMap():
             map_observed = jax.random.poisson(key=subkey2,lam=map_counts) - sky_counts - dark_current_total
             map_out = map_out + jnp.sum(map_observed + rdnoise_map, axis=-1)
             frame_num = int(i*10) 
-            if frame_num % 500 == 0:
+            if frame_num % write_out_every == 0:
                 # we will write out this frame 
                 tmp = jnp.copy(map_out) / float(frame_num+10) 
                 if seeing_fwhm is not None:
@@ -483,8 +484,10 @@ class SBMap():
         if verbose:
             print('Combining individual exposures.')
         self.map_observed = map_out / n_exposures 
-        fits_out.append(fits.ImageHDU(self.map_observed))
-        prim.header[f'HDR_{n_headers}'] = 'FINAL'
+        last_hdu = fits.ImageHDU(self.map_observed) 
+        last_hdu.header['OBJECT'] = f'{n_exposures} combined'
+        fits_out.append(last_hdu)
+        prim.header[f'HDR_{n_headers}'] = f'FINAL {n_exposures}'
 
         if seeing_fwhm is not None:
             self.map_observed = self.apply_seeing(self.map_observed,seeing_fwhm)
