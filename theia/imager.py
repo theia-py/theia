@@ -258,7 +258,7 @@ class SBMap():
         self.diameter = check_units(optical_diameter,'m')
         self.area = np.pi*(self.diameter/2.0)**2
 
-        self.pixel_scale= check_units(pixel_scale,'arcsec/pixel')
+        self.pixel_scale= pixel_scale
         
         self.read_noise = read_noise
         self.efficiency = efficiency
