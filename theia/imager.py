@@ -258,7 +258,7 @@ class SBMap():
         self.diameter = check_units(optical_diameter,'m')
         self.area = np.pi*(self.diameter/2.0)**2
 
-        self.pixel_scale= pixel_scale * (u.arcsec/u.pixel)
+        self.pixel_scale= pixel_scale
         
         self.read_noise = read_noise
         self.efficiency = efficiency
@@ -319,7 +319,7 @@ class SBMap():
         sb_map = sb_map * u.photon / u.s / u.cm**2 / u.arcsec**2 
         sb_map = sb_map * (exptime*u.s)
         sb_map = sb_map * self.area.to(u.cm**2)
-        sb_map = sb_map * (self.pixel_scale.value*u.arcsec)**2
+        sb_map = sb_map * (self.pixel_scale*u.arcsec)**2
         return sb_map 
     
     def apply_seeing(self,image,seeing_fwhm,boundary='center'):
