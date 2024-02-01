@@ -19,7 +19,7 @@ def fnu_from_AB_mag(mag):
     fnu = 10.**((mag + mAB_0)/(-2.5))
     return fnu*u.erg/u.s/u.Hz/u.cm**2
 
-def mags_to_counts(sb, exptime, pixel_scale,area,efficiency,dlam,lam_eff):
+def mags_to_counts(sb, exptime, pixel_scale,area,dlam,lam_eff):
         """
         Convert a constant surface brightness into counts per pixel.
         Parameters
@@ -52,6 +52,5 @@ def mags_to_counts(sb, exptime, pixel_scale,area,efficiency,dlam,lam_eff):
         counts_per_pixel = photon_flux_per_sq_pixel * exptime.to('s')
         counts_per_pixel *= area.to('cm2') * u.pixel**2
         assert counts_per_pixel.unit == u.dimensionless_unscaled
-        counts_per_pixel *= efficiency
         counts_per_pixel = counts_per_pixel.value
         return counts_per_pixel

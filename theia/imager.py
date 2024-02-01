@@ -227,6 +227,7 @@ class SBMap():
                         source_velocity: Union[float,u.Quantity],
                         emission_wl: Union[float,u.Quantity],
                         read_noise: float,
+                        gain: float,
                         efficiency: float = 1.0,
                         dark_current: float = 0.0,
                         **kwargs):
@@ -251,7 +252,7 @@ class SBMap():
         efficiency: float, default: 1.0
             quantum efficiency of the detector *at the wavelengths of interest*. Between 0 and 1. 
         dark_current: float, default: 0.0
-            dark current in e- per second for the operating cooled detector. 
+            dark current in e- per second per pixel for the operating cooled detector. 
         
         
         """
@@ -267,6 +268,7 @@ class SBMap():
         emission_wl = check_units(emission_wl,'angstrom')
         source_velocity = check_units(source_velocity,'km/s')
         self.lam_eff = self.lam_eff_from_v(emission_wl,source_velocity)
+        self.gain = gain 
         self.storage = {
                         'pixscale':f'{pixel_scale} "/pix',
                         'area': f'{self.area:.2f}',
@@ -277,6 +279,7 @@ class SBMap():
                         'srcvel': f'{source_velocity}',
                         'srclam': f'{emission_wl}',
                         'lameff': f'{self.lam_eff:.2f}',
+                        'gain':f'{self.gain:.2f}'
         }
 
 
@@ -302,7 +305,7 @@ class SBMap():
     
     def convert_maps_to_counts(self,sb_map,exptime):
         """
-        Convert a map in ph/s/cm2/arcsec2 into photons, by multipying by exptime and telescope properties.
+        Convert a map in ph/s/cm2/arcsec2 into photons, then to electrons by multipying by exptime and telescope properties. 
 
         Parameters
         ----------
@@ -310,7 +313,8 @@ class SBMap():
             the map array in ph/s/cm2/arcsec2
         exptime: float
             exposure time in seconds. 
-        
+        gain: float
+            gain in electron / ADU 
         Returns
         -------
         sb_map: array_like
@@ -401,7 +405,7 @@ class SBMap():
         output_wcs.wcs.cdelt = -desired_pixel_scale.value, desired_pixel_scale.value
         
         #Modify maps into counts
-        map_use= self.convert_maps_to_counts(self.map,exptime)*self.efficiency
+        map_use= self.convert_maps_to_counts(self.map,exptime)
         
         if verbose:
             print('Reprojecting onto DSLM pixel scale.')
@@ -442,33 +446,36 @@ class SBMap():
                                             pixel_scale=self.pixel_scale*u.arcsec,
                                             effective_area=self.area
                                             )
+            
         else:
             if sky_magnitude is not None:
                 sky_counts = mags_to_counts(sky_magnitude,
                                             self.exptime,
                                             self.pixel_scale*(u.arcsec/u.pixel),
                                             self.area,
-                                            self.efficiency,
                                             self.filter_bandpass,
                                             self.lam_eff)
             elif sky_counts is not None:
                 sky_counts = sky_counts
             else: 
                 raise AssertionError('Either sky counts or sky mag must be provided if use spectrum is false.')
-        map_use = self.reprojected_map
-        map_out = jnp.zeros(map_use.shape)
-        dark_current_total = self.dark_current*self.exptime.value
+        sky_counts_electrons = sky_counts * self.efficiency # electrons
+        map_electrons = self.reprojected_map * self.efficiency # electrons
+
+        map_out = jnp.zeros(map_electrons.shape)
+        dark_current_total = self.dark_current*self.exptime.value # this is in electrons (per pixel)
         prim = fits.PrimaryHDU()
         fits_out = fits.HDUList([prim])
         n_headers = 1
         for i in tqdm(range(int(n_exposures/10))):
             key, subkey = jax.random.split(key)
             key, subkey2 = jax.random.split(key)
-            rdnoise_map = jax.random.normal(key=subkey,shape=(map_out.shape[0],map_out.shape[1],10))*self.read_noise
-            map_counts = map_use + sky_counts + dark_current_total
+            rdnoise_map = jax.random.normal(key=subkey,shape=(map_out.shape[0],map_out.shape[1],10))*self.read_noise #read noise measured in electron
+            map_counts = map_electrons + sky_counts_electrons + dark_current_total #all three measured in electrons
             map_counts = jnp.repeat(map_counts[:, :, np.newaxis], 10, axis=2)
-            map_observed = jax.random.poisson(key=subkey2,lam=map_counts) - sky_counts - dark_current_total
-            map_out = map_out + jnp.sum(map_observed + rdnoise_map, axis=-1)
+            map_observed = jax.random.poisson(key=subkey2,lam=map_counts) - sky_counts_electrons - dark_current_total
+            map_ADU = jnp.sum(map_observed + rdnoise_map, axis=-1) * self.gain # convert the final electron measurement to ADU
+            map_out = map_out + map_ADU 
             frame_num = int(i*10) 
             if frame_num % write_out_every == 0:
                 # we will write out this frame 
