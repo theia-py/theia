@@ -468,8 +468,7 @@ class SBMap():
         fits_out = fits.HDUList([prim])
         n_headers = 1
         for i in tqdm(range(int(n_exposures/10))):
-            key, subkey = jax.random.split(key)
-            key, subkey2 = jax.random.split(key)
+            subkey, subkey2 = jax.random.split(key)
             rdnoise_map = jax.random.normal(key=subkey,shape=(map_out.shape[0],map_out.shape[1],10))*self.read_noise #read noise measured in electron
             map_counts = map_electrons + sky_counts_electrons + dark_current_total #all three measured in electrons
             map_counts = jnp.repeat(map_counts[:, :, np.newaxis], 10, axis=2)
